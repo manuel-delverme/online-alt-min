@@ -1,8 +1,3 @@
-from collections import MutableMapping
-from random import randint
-import os
-import time
-import copy
 import torch
 
 
@@ -29,4 +24,3 @@ def get_devices(cuda_device="cuda:0", seed=1):
         print('\033[93m'+'Using CUDA,', num_gpus, 'GPUs\033[0m')
         torch.cuda.manual_seed(seed)
     return device, num_gpus
-

@@ -14,6 +14,7 @@ class Flatten(nn.Module):
     Outputs:
         - **outputs** (batch, num_dim1*num_dim2*...): tensor containing the output
     """
+
     def __init__(self):
         super(Flatten, self).__init__()
 
@@ -35,9 +36,9 @@ def compute_codes_loss(codes, nmod, lin, loss_fn, codes_targets, mu, lambda_c):
         - **loss**: loss
     """
     output = lin(nmod(codes))
-    loss = (1/mu)*loss_fn(output) + F.mse_loss(codes, codes_targets)
-    if lambda_c>0.0:
-        loss += (lambda_c/mu)*codes.abs().mean()
+    loss = (1 / mu) * loss_fn(output) + F.mse_loss(codes, codes_targets)
+    if lambda_c > 0.0:
+        loss += (lambda_c / mu) * codes.abs().mean()
     return loss
 
 
@@ -62,10 +63,10 @@ def update_memory(As, Bs, inputs, codes, model_mods, eta=0.0):
         x = inputs
 
     with torch.no_grad():
-        id_codes = [i for i,m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
-        for i, (idx, c_in, c_out) in enumerate(zip(id_codes, [x]+codes[:-1], codes)):
+        id_codes = [i for i, m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
+        for i, (idx, c_in, c_out) in enumerate(zip(id_codes, [x] + codes[:-1], codes)):
             try:
-                nmod = model_mods[idx-1]
+                nmod = model_mods[idx - 1]
             except IndexError:
                 nmod = lambda x: x
 
@@ -74,15 +75,15 @@ def update_memory(As, Bs, inputs, codes, model_mods, eta=0.0):
                 As[i] += a.t().mm(a)
                 Bs[i] += c_out.t().mm(a)
             else:
-                As[i] = (1-eta)*As[i] + eta*a.t().mm(a)
-                Bs[i] = (1-eta)*Bs[i] + eta*c_out.t().mm(a)
+                As[i] = (1 - eta) * As[i] + eta * a.t().mm(a)
+                Bs[i] = (1 - eta) * Bs[i] + eta * c_out.t().mm(a)
     return As, Bs
 
 
 def update_hidden_weights_bcd_(model_mods, As, Bs, lambda_w, max_iter=1):
     r"""Use BCD to update weights of intermediate modules
     """
-    id_codes = [i for i,m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
+    id_codes = [i for i, m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
     for i, A, B in zip(id_codes, As, Bs):
         model_mods[i].weight.data = BCD(model_mods[i].weight.data, A, B, lambda_w, max_iter=max_iter)
 
@@ -100,13 +101,13 @@ def BCD(w, A, B, lambda_w, eps=1e-3, max_iter=20, return_errors=False):
             w_pre = w.clone()
             error = 0
             for j in range(A.shape[1]):
-                delta_j = (B[:,j] - w.mv(A[:,j]))
-                w[:,j].add_(delta_j)
+                delta_j = (B[:, j] - w.mv(A[:, j]))
+                w[:, j].add_(delta_j)
                 #  u_j /= max(u_j.norm(), 1.0) # This was in Mairal2009, but assumes that B has spectral radius smaller than A
                 # Shrinkage step (sparsity regularizer)
                 if lambda_w > 0.0:
-                    sign_w = w[:,j].sign()
-                    w[:,j].abs_().add_(-lambda_w).clamp_(min=0.0).mul_(sign_w)
+                    sign_w = w[:, j].sign()
+                    w[:, j].abs_().add_(-lambda_w).clamp_(min=0.0).mul_(sign_w)
                 error += delta_j.abs().mean().item()
             errors.append(error)
             # Converged is there is no change between steps
@@ -117,13 +118,6 @@ def BCD(w, A, B, lambda_w, eps=1e-3, max_iter=20, return_errors=False):
         return w, errors
     else:
         return w
-
-
-def post_processing_step(model, data, target, criterion, n_iter=1):
-    with torch.no_grad():
-        output, codes = get_codes(model, data)
-
-    update_last_layer_(model[-1], codes[-1], target, criterion, n_iter=n_iter)
 
 
 def insert_mod(model_mods, mod, has_codes):
@@ -176,10 +170,10 @@ def get_mods(model, optimizer=None, optimizer_params={}, scheduler=None, data_pa
     insert_mod(model_mods, lmod, has_codes=True)
 
     # Last layer that generates codes is lumped together with adjacent modules to produce the last layer
-    id_codes = [i for i,m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
+    id_codes = [i for i, m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
 
-    model_tmp = model_mods[:id_codes[-2]+1]
-    model_tmp.add_module(str(len(model_tmp)), model_mods[id_codes[-2]+1:])
+    model_tmp = model_mods[:id_codes[-2] + 1]
+    model_tmp.add_module(str(len(model_tmp)), model_mods[id_codes[-2] + 1:])
     model_tmp[-1].has_codes = False
     model_mods = model_tmp
 
@@ -203,7 +197,7 @@ def get_mods(model, optimizer=None, optimizer_params={}, scheduler=None, data_pa
 
 
 def data_parallel_mods_(model_mods):
-    for i,m in enumerate(model_mods):
+    for i, m in enumerate(model_mods):
         model_mods[i] = torch.nn.DataParallel(m)
         model_mods[i].has_codes = m.has_codes
         if hasattr(m, 'optimizer'):
@@ -231,39 +225,41 @@ def get_codes(model_mods, inputs):
 
 
 def update_codes(codes, model_mods, targets, criterion, mu, lambda_c, n_iter, lr):
-    id_codes = [i for i,m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
-    for l in range(1, len(codes)+1):
+    id_codes = [i for i, m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
+    num_gradients = 0
+    for l in range(1, len(codes) + 1):
         idx = id_codes[-l]
 
         codes[-l].requires_grad_(True)
         optimizer = optim.SGD([codes[-l]], lr=lr, momentum=0.9, nesterov=True)
         codes_initial = codes[-l].clone()
 
-        if idx+1 in id_codes:
+        if idx + 1 in id_codes:
             nmod = lambda x: x
-            lin = model_mods[idx+1]
+            lin = model_mods[idx + 1]
         else:
             try:
-                nmod = model_mods[idx+1]
+                nmod = model_mods[idx + 1]
             except IndexError:
                 nmod = lambda x: x
             try:
-                lin = model_mods[idx+2]
+                lin = model_mods[idx + 2]
             except IndexError:
                 lin = lambda x: x
 
         if l == 1:  # last layer
             loss_fn = lambda x: criterion(x, targets)
-        else:       # intermediate layers
-            loss_fn = lambda x: mu*F.mse_loss(x, codes[-l+1].detach())
+        else:  # intermediate layers
+            loss_fn = lambda x: mu * F.mse_loss(x, codes[-l + 1].detach())
 
         for it in range(n_iter):
             optimizer.zero_grad()
             loss = compute_codes_loss(codes[-l], nmod, lin, loss_fn, codes_initial, mu, lambda_c)
             loss.backward()
+            num_gradients += 1
             optimizer.step()
 
-    return codes
+    return codes, num_gradients
 
 
 def update_last_layer_(mod_out, inputs, targets, criterion, n_iter):
@@ -273,20 +269,22 @@ def update_last_layer_(mod_out, inputs, targets, criterion, n_iter):
         loss = criterion(outputs, targets)
         loss.backward()
         mod_out.optimizer.step()
+    return n_iter
 
 
 def update_hidden_weights_adam_(model_mods, inputs, codes, lambda_w, n_iter):
-    id_codes = [i for i,m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
+    id_codes = [i for i, m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
 
+    num_gradients = 0
     if hasattr(model_mods, 'n_inputs'):
         x = inputs.view(-1, model_mods.n_inputs)
     else:
         x = inputs
 
-    for idx, c_in, c_out in zip(id_codes, [x]+codes[:-1], codes):
+    for idx, c_in, c_out in zip(id_codes, [x] + codes[:-1], codes):
         lin = model_mods[idx]
-        if idx >= 1 and not idx-1 in id_codes:
-            nmod = model_mods[idx-1]
+        if idx >= 1 and not idx - 1 in id_codes:
+            nmod = model_mods[idx - 1]
         else:
             nmod = lambda x: x
 
@@ -294,9 +292,11 @@ def update_hidden_weights_adam_(model_mods, inputs, codes, lambda_w, n_iter):
             lin.optimizer.zero_grad()
             loss = F.mse_loss(lin(nmod(c_in)), c_out.detach())
             if lambda_w > 0.0:
-                loss += lambda_w*lin.weight.abs().mean()
+                loss += lambda_w * lin.weight.abs().mean()
             loss.backward()
+            num_gradients += 1
             lin.optimizer.step()
+    return num_gradients
 
 
 def scheduler_step(model_mods):
@@ -309,30 +309,29 @@ def scheduler_step(model_mods):
 # Non-diff
 # ------------------------------------------------------------------------
 def update_hidden_weights_nondiff_(model_mods, inputs, codes, lambda_w, n_iter):
-    id_codes = [i for i,m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
+    id_codes = [i for i, m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
 
     if hasattr(model_mods, 'n_inputs'):
         x = inputs.view(-1, model_mods.n_inputs)
     else:
         x = inputs
 
-    for idx, c_in, c_out in zip(id_codes, [x]+codes[:-1], codes):
+    for idx, c_in, c_out in zip(id_codes, [x] + codes[:-1], codes):
         lin = model_mods[idx]
-        if idx >= 1 and not idx-1 in id_codes:
-            nmod = model_mods[idx-1]
+        if idx >= 1 and not idx - 1 in id_codes:
+            nmod = model_mods[idx - 1]
         else:
             nmod = lambda x: x
 
         for it in range(n_iter):
             lin.optimizer.zero_grad()
             # Hinge loss
-            loss = F.relu(0.0-lin(nmod(c_in))*c_out.detach().sign()).mean()
+            loss = F.relu(0.0 - lin(nmod(c_in)) * c_out.detach().sign()).mean()
             #  loss = F.mse_loss(lin(nmod(c_in)), c_out.detach())
             if lambda_w > 0.0:
-                loss += lambda_w*lin.weight.abs().mean()
+                loss += lambda_w * lin.weight.abs().mean()
             loss.backward()
             lin.optimizer.step()
-
 
 
 def get_mods_nondiff(model, optimizer=None, optimizer_params={}, scheduler=None, data_parallel=False):
@@ -354,8 +353,8 @@ def get_mods_nondiff(model, optimizer=None, optimizer_params={}, scheduler=None,
 
 
 def update_codes_nondiff(codes, model_mods, targets, criterion, mu, lambda_c, n_iter, lr):
-    id_codes = [i for i,m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
-    for l in range(1, len(codes)+1):
+    id_codes = [i for i, m in enumerate(model_mods) if hasattr(m, 'has_codes') and getattr(m, 'has_codes')]
+    for l in range(1, len(codes) + 1):
         idx = id_codes[-l]
 
         codes_initial = codes[-l].clone().detach()
@@ -363,20 +362,20 @@ def update_codes_nondiff(codes, model_mods, targets, criterion, mu, lambda_c, n_
         optimizer = optim.SGD([codes[-l]], lr=lr, momentum=0.9, nesterov=True)
 
         if l == 1:  # last layer
-            nmod = model_mods[idx+1]
+            nmod = model_mods[idx + 1]
             try:
-                lin = model_mods[idx+2]
+                lin = model_mods[idx + 2]
             except IndexError:
                 lin = lambda x: x
             loss_fn = lambda x: criterion(x, targets)
-        else:       # intermediate layers
-            idx_next = id_codes[-l+1]
+        else:  # intermediate layers
+            idx_next = id_codes[-l + 1]
 
-            nmod = model_mods[idx+1:idx_next]
+            nmod = model_mods[idx + 1:idx_next]
             lin = model_mods[idx_next]
 
-            loss_fn = lambda x: mu*F.mse_loss(x, codes[-l+1].detach())# + 1.0*torch.min(F.relu(1+x), F.relu(1-x)).mean()
-            #+ 0.1*(torch.min(x.abs(), (1-x).abs())).mean()
+            loss_fn = lambda x: mu * F.mse_loss(x, codes[-l + 1].detach())  # + 1.0*torch.min(F.relu(1+x), F.relu(1-x)).mean()
+            # + 0.1*(torch.min(x.abs(), (1-x).abs())).mean()
 
         for it in range(n_iter):
             optimizer.zero_grad()

@@ -91,7 +91,7 @@ def test(model, data_loader, criterion=nn.CrossEntropyLoss(), label=''):
     if label:
         print('{}: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
             label, test_loss, correct, len(data_loader.dataset), 100. * accuracy))
-    return accuracy
+    return accuracy, test_loss
 
 
 class LeNet(nn.Module):
