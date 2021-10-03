@@ -1,4 +1,5 @@
 import torch
+import torch.utils
 from torchvision import datasets, transforms
 
 
