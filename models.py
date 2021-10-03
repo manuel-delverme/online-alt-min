@@ -5,6 +5,7 @@ import torch.nn as nn
 class LinMod(nn.Linear):
     '''Linear modules with or without batchnorm, all in one module
     '''
+
     def __init__(self, n_inputs, n_outputs, bias=False, batchnorm=False):
         super(LinMod, self).__init__(n_inputs, n_outputs, bias=bias)
         if batchnorm:
@@ -28,6 +29,7 @@ class LinMod(nn.Linear):
 class FFNet(nn.Module):
     '''Feed-forward all-to-all connected network
     '''
+
     def __init__(self, n_inputs, n_hiddens, n_hidden_layers=2, n_outputs=10, nlin=nn.ReLU, bias=False, batchnorm=False):
         super(FFNet, self).__init__()
 
@@ -97,6 +99,7 @@ def test(model, data_loader, criterion=nn.CrossEntropyLoss(), label=''):
 class LeNet(nn.Module):
     '''Based on https://github.com/kuangliu/pytorch-cifar/blob/master/models/lenet.py
     '''
+
     def __init__(self, num_input_channels=3, num_classes=10, window_size=32, bias=True):
         super(LeNet, self).__init__()
         self.bias = bias
@@ -111,7 +114,7 @@ class LeNet(nn.Module):
             nn.MaxPool2d(kernel_size=2),
         )
         self.classifier = nn.Sequential(
-            nn.Linear(16 * int((int((window_size - 4) / 2) - 4) / 2)**2, 120, bias=bias),
+            nn.Linear(16 * int((int((window_size - 4) / 2) - 4) / 2) ** 2, 120, bias=bias),
             nn.ReLU(),
             nn.Linear(120, 84, bias=bias),
             nn.ReLU(),
@@ -132,6 +135,7 @@ class StepF(torch.autograd.Function):
     ''' A step function that returns values in {-1, 1} and uses the Straigh-Through Estimator
         to update upstream weights in the network
     '''
+
     @staticmethod
     def forward(ctx, input_):
         ctx.save_for_backward(input_)
@@ -150,6 +154,7 @@ class StepF(torch.autograd.Function):
 class Step(nn.Module):
     '''Module wrapper for a step function (StepF).
     '''
+
     def __init__(self):
         super(Step, self).__init__()
 
